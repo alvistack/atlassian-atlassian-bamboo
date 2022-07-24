@@ -1,0 +1,4 @@
+atlassian-bamboo source: license-problem-json-evil
+atlassian-bamboo source: no-debian-changes
+atlassian-bamboo source: source-contains-prebuilt-windows-binary
+atlassian-bamboo source: source-is-missing

@@ -1,0 +1,17 @@
+atlassian-bamboo: classpath-contains-relative-path
+atlassian-bamboo: codeless-jar
+atlassian-bamboo: copyright-without-copyright-notice
+atlassian-bamboo: description-is-pkg-name
+atlassian-bamboo: dir-or-file-in-opt
+atlassian-bamboo: embedded-javascript-library
+atlassian-bamboo: executable-not-elf-or-script
+atlassian-bamboo: initial-upload-closes-no-bugs
+atlassian-bamboo: jar-contains-source
+atlassian-bamboo: jar-not-in-usr-share
+atlassian-bamboo: national-encoding
+atlassian-bamboo: non-standard-dir-in-var
+atlassian-bamboo: privacy-breach-google-adsense
+atlassian-bamboo: shell-script-fails-syntax-check
+atlassian-bamboo: unknown-java-class-version
+atlassian-bamboo: virtual-package-depends-without-real-package-depends
+atlassian-bamboo: zero-byte-file-in-doc-directory
