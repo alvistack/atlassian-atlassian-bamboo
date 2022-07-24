@@ -1,0 +1,6 @@
+*.substvars
+*debhelper*
+.debhelper
+atlassian-bamboo
+files
+tmp
