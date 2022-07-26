@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+BAMBOO_CATALINA=/opt/atlassian/bamboo
+
+chown -Rf bamboo:bamboo $BAMBOO_CATALINA
+chmod 0700 $BAMBOO_CATALINA
+
+#DEBHELPER#
+
+exit 0
