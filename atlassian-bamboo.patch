@@ -1,0 +1,120 @@
+diff --git a/opt/atlassian/bamboo/bin/setenv.sh b/opt/atlassian/bamboo/bin/setenv.sh
+index 56466c7..e1bf65c 100755
+--- a/opt/atlassian/bamboo/bin/setenv.sh
++++ b/opt/atlassian/bamboo/bin/setenv.sh
+@@ -1,8 +1,9 @@
+-#!/bin/sh
++#!/bin/bash
+ #
+ # One way to set the Bamboo HOME path is here via this variable.  Simply uncomment it and set a valid path like /bamboo/home.  You can of course set it outside in the command terminal.  That will also work.
+ #
+-#BAMBOO_HOME=""
++BAMBOO_HOME="/var/atlassian/application-data/bamboo"
++BAMBOO_CATALINA="/opt/atlassian/bamboo"
+ 
+ #
+ # Recommended JVM setting for Embedded Crowd
+@@ -12,7 +13,7 @@
+ #
+ #  Occasionally Atlassian Support may recommend that you set some specific JVM arguments.  You can use this variable below to do that.
+ #
+-: ${JVM_SUPPORT_RECOMMENDED_ARGS:=""}
++: ${JVM_SUPPORT_RECOMMENDED_ARGS:="-Datlassian.plugins.enable.wait=300 -XX:+UnlockExperimentalVMOptions"}
+ 
+ #
+ #  Uncomment the line below to enable the Byteman agent.
+@@ -23,13 +24,13 @@
+ # The following 2 settings control the minimum and maximum given to the Bamboo Java virtual machine.  In larger Bamboo instances, the amounts will need to be increased.
+ # We recommend that the minimum and maximum be set to the same value.
+ #
+-: ${JVM_MINIMUM_MEMORY:=1024m}
+-: ${JVM_MAXIMUM_MEMORY:=1024m}
++: ${JVM_MINIMUM_MEMORY:="2048m"}
++: ${JVM_MAXIMUM_MEMORY:="2048m"}
+ 
+ #
+ # The following are the required arguments need for Bamboo standalone.
+ #
+-: ${JVM_REQUIRED_ARGS:="-XX:+UseG1GC"}
++: ${JVM_REQUIRED_ARGS:="-XX:+UseZGC -XX:+ExplicitGCInvokesConcurrent"}
+ 
+ #-----------------------------------------------------------------------------------
+ #
+@@ -53,11 +54,43 @@ if [ "$BAMBOO_HOME" != "" ]; then
+    fi
+ fi
+ 
+-JAVA_OPTS="-Xms${JVM_MINIMUM_MEMORY} -Xmx${JVM_MAXIMUM_MEMORY} ${JAVA_OPTS} ${JVM_REQUIRED_ARGS} ${JVM_SUPPORT_RECOMMENDED_ARGS} ${JVM_EC_RECOMMENDED_ARGS} ${BAMBOO_HOME_MINUSD}"
++JAVA_OPTS="-XX:ReservedCodeCacheSize=512m"
++JAVA_OPTS="-Xms${JVM_MINIMUM_MEMORY} -Xmx${JVM_MAXIMUM_MEMORY} ${JAVA_OPTS} ${JVM_SUPPORT_RECOMMENDED_ARGS} ${JVM_EC_RECOMMENDED_ARGS} ${JVM_REQUIRED_ARGS} ${BAMBOO_HOME_MINUSD}"
++
++# Perm Gen size needs to be increased if encountering OutOfMemoryError: PermGen problems. Specifying PermGen size is not valid on IBM JDKs
++BAMBOO_MAX_PERM_SIZE=256m
++if [ -f "${PRGDIR}/permgen.sh" ]; then
++    echo "Detecting JVM PermGen support..."
++    . "${PRGDIR}/permgen.sh"
++    if [ $JAVA_PERMGEN_SUPPORTED = "true" ]; then
++        echo "PermGen switch is supported. Setting to ${BAMBOO_MAX_PERM_SIZE}"
++        JAVA_OPTS="-XX:MaxPermSize=${BAMBOO_MAX_PERM_SIZE} ${JAVA_OPTS}"
++    else
++        echo "PermGen switch is NOT supported and will NOT be set automatically."
++    fi
++fi
+ 
+ JAVA_OPTS=$(echo "$JAVA_OPTS" | sed -e 's/\s*$//' -e 's/^\s*//')
+ export JAVA_OPTS
+ 
++CATALINA_OPTS="-Dbamboo.catalina.connector.port=8085 ${CATALINA_OPTS}"
++CATALINA_OPTS="-Dbamboo.catalina.connector.scheme=http ${CATALINA_OPTS}"
++CATALINA_OPTS="-Dbamboo.catalina.connector.secure=false ${CATALINA_OPTS}"
++CATALINA_OPTS="-Dbamboo.catalina.connector.proxyname= ${CATALINA_OPTS}"
++CATALINA_OPTS="-Dbamboo.catalina.connector.proxyport= ${CATALINA_OPTS}"
++CATALINA_OPTS="-Dbamboo.catalina.context.path= ${CATALINA_OPTS}"
++export CATALINA_OPTS
++
++# set the location of the pid file
++if [ -z "$CATALINA_PID" ] ; then
++    if [ -n "$CATALINA_BASE" ] ; then
++        CATALINA_PID="$CATALINA_BASE"/work/catalina.pid
++    elif [ -n "$CATALINA_HOME" ] ; then
++        CATALINA_PID="$CATALINA_HOME"/work/catalina.pid
++    fi
++fi
++export CATALINA_PID
++
+ echo ""
+ echo "If you encounter issues starting or stopping Bamboo Server, please see the Troubleshooting guide at https://confluence.atlassian.com/display/BAMBOO/Installing+and+upgrading+Bamboo"
+ echo ""
+diff --git a/opt/atlassian/bamboo/conf/server.xml b/opt/atlassian/bamboo/conf/server.xml
+index 179b507..73c5600 100644
+--- a/opt/atlassian/bamboo/conf/server.xml
++++ b/opt/atlassian/bamboo/conf/server.xml
+@@ -46,7 +46,7 @@
+     <Service name="Catalina">
+ 
+         <Connector
+-                port="8085"
++                port="${bamboo.catalina.connector.port}"
+                 protocol="HTTP/1.1"
+ 
+                 maxThreads="150" minSpareThreads="25"
+@@ -60,6 +60,10 @@
+                 useBodyEncodingForURI="true"
+                 URIEncoding="UTF-8"
+ 
++                relaxedPathChars="[]|" relaxedQueryChars="[]|{}^&#x5c;&#x60;&quot;&lt;&gt;"
++                scheme="${bamboo.catalina.connector.scheme}" secure="${bamboo.catalina.connector.secure}"
++                proxyName="${bamboo.catalina.connector.proxyname}" proxyPort="${bamboo.catalina.connector.proxyport}"
++
+                 redirectPort="8443">
+             <UpgradeProtocol className="org.apache.coyote.http2.Http2Protocol" />
+         </Connector>
+@@ -154,7 +158,7 @@
+         <Engine name="Catalina" defaultHost="localhost">
+             <Host name="localhost" appBase="webapps" unpackWARs="true" autoDeploy="true">
+ 
+-                <Context path="" docBase="${catalina.home}/atlassian-bamboo" reloadable="false" useHttpOnly="true">
++                <Context path="${bamboo.catalina.context.path}" docBase="${catalina.home}/atlassian-bamboo" reloadable="false" useHttpOnly="true">
+ 
+                     <!--<Resource name="UserTransaction" auth="Container" type="javax.transaction.UserTransaction"-->
+                               <!--factory="org.objectweb.jotm.UserTransactionFactory" jotm.timeout="60"/>-->
