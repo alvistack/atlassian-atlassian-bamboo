@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+BAMBOO_HOME=/var/atlassian/application-data/bamboo
+
+if [ ! -d $BAMBOO_HOME -a ! -L $BAMBOO_HOME ]; then
+    mkdir -p $BAMBOO_HOME
+fi
+
+if ! getent group bamboo >/dev/null; then
+    groupadd \
+        --system \
+        bamboo
+fi
+
+if ! getent passwd bamboo >/dev/null; then
+    useradd \
+        --system \
+        --gid bamboo \
+        --home-dir $BAMBOO_HOME \
+        --no-create-home \
+        --shell /usr/sbin/nologin \
+        bamboo
+fi
+
+chown -Rf bamboo:bamboo $BAMBOO_HOME
+chmod 0750 $BAMBOO_HOME
+
+#DEBHELPER#
+
+exit 0
