@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+BAMBOO_DOWNLOAD_URL=http://product-downloads.atlassian.com/software/bamboo/downloads/atlassian-bamboo-9.4.2.tar.gz
+BAMBOO_DOWNLOAD_DEST=/tmp/atlassian-bamboo-9.4.2.tar.gz
+BAMBOO_DOWNLOAD_CHECKSUM=305ebe9e3f577857c7c76db928a336c224a196be25c26b859beeca8d51d32cc3
+
+BAMBOO_CATALINA=/opt/atlassian/bamboo
+BAMBOO_PATCH=/opt/atlassian/atlassian-bamboo.patch
+
+wget -c $BAMBOO_DOWNLOAD_URL -O $BAMBOO_DOWNLOAD_DEST
+echo -n "$BAMBOO_DOWNLOAD_CHECKSUM $BAMBOO_DOWNLOAD_DEST" | sha256sum -c -
+
+rm -rf $BAMBOO_CATALINA
+mkdir -p $BAMBOO_CATALINA
+tar zxf $BAMBOO_DOWNLOAD_DEST -C $BAMBOO_CATALINA --strip-components=1
+
+cat $BAMBOO_PATCH | patch -p1 -d /
+chmod a+x $BAMBOO_CATALINA/bin/start-bamboo.sh
+chmod a+x $BAMBOO_CATALINA/bin/stop-bamboo.sh
+find $BAMBOO_CATALINA -type f -name '*.so' -exec chrpath -d {} \;
+find $BAMBOO_CATALINA -type f -name '*.bak' -delete
+find $BAMBOO_CATALINA -type f -name '*.orig' -delete
+find $BAMBOO_CATALINA -type f -name '*.rej' -delete
+fdupes -qnrps $BAMBOO_CATALINA
+
+chown -Rf bamboo:bamboo $BAMBOO_CATALINA
+chmod 0700 $BAMBOO_CATALINA
+
+#DEBHELPER#
+
+exit 0
