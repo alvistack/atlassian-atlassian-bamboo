@@ -1,0 +1,2 @@
+usr/lib/systemd/system/bamboo.service
+opt/atlassian/atlassian-bamboo.patch
